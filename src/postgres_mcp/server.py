@@ -13,6 +13,7 @@ from typing import Union
 
 import mcp.types as types
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import Field
 from pydantic import validate_call
@@ -34,8 +35,29 @@ from .sql import check_hypopg_installation_status
 from .sql import obfuscate_password
 from .top_queries import TopQueriesCalc
 
-# Initialize FastMCP with default settings
-mcp = FastMCP("postgres-mcp")
+# Initialize FastMCP with transport security settings
+# Configure to allow requests from localhost, 127.0.0.1, and Docker container names
+# These can be customized via environment variables:
+# - MCP_ENABLE_DNS_REBINDING_PROTECTION: Set to "false" to disable (default: "true")
+# - MCP_ALLOWED_HOSTS: Comma-separated list of allowed hosts (default: localhost:*,127.0.0.1:*,0.0.0.0:*,postgres-mcp-server:*,host.docker.internal:*)
+# - MCP_ALLOWED_ORIGINS: Comma-separated list of allowed origins (default: empty, allows any origin)
+
+dns_rebinding_protection = os.environ.get("MCP_ENABLE_DNS_REBINDING_PROTECTION", "true").lower() == "true"
+
+default_allowed_hosts = "localhost:*,127.0.0.1:*,0.0.0.0:*,postgres-mcp-server:*,host.docker.internal:*"
+allowed_hosts_str = os.environ.get("MCP_ALLOWED_HOSTS", default_allowed_hosts)
+allowed_hosts = [host.strip() for host in allowed_hosts_str.split(",") if host.strip()]
+
+allowed_origins_str = os.environ.get("MCP_ALLOWED_ORIGINS", "")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
+
+transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=dns_rebinding_protection,
+    allowed_hosts=allowed_hosts,
+    allowed_origins=allowed_origins,
+)
+
+mcp = FastMCP("postgres-mcp", transport_security=transport_security)
 
 # Constants
 PG_STAT_STATEMENTS = "pg_stat_statements"
